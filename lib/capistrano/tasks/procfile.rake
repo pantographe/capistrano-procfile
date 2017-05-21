@@ -13,11 +13,11 @@ namespace :procfile do
   task :applying => [:set_procfile, :set_host_properties] do
     common_options = fetch(:procfile_options, {})
 
+    procfile = fetch(:procfile, nil)
+    next if procfile.nil?
+
     on release_roles(:all) do |host|
       within release_path do
-        procfile = fetch(:procfile, nil)
-        next if procfile.nil?
-
         @application_name  = fetch(:application)
         services_templates = {}
 
@@ -91,10 +91,10 @@ namespace :procfile do
 
   desc "Restart services"
   task :restart => [:set_procfile] do
+    next if fetch(:procfile, nil).nil?
+
     on release_roles(:all) do
       within release_path do
-        next if fetch(:procfile, nil).nil?
-
         sudo :systemctl, "restart", "#{Utils.parameterize(fetch(:procfile_service_name))}.target"
       end
     end
@@ -102,9 +102,10 @@ namespace :procfile do
 
   desc "Cleanup services"
   task :cleanup => [:set_procfile] do
-    on roles(:all) do
+    next if fetch(:procfile, nil).nil?
+
+    on roles(:all) do |host|
       within release_path do
-        next if fetch(:procfile, nil).nil?
       end
     end
   end
