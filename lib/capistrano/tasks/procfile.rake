@@ -122,6 +122,6 @@ namespace :load do
     set_if_empty :procfile_service_name,           -> { fetch(:application) }
     set_if_empty :procfile_service_path,           "/lib/systemd/system"
     set_if_empty :procfile_service_template_path,  File.expand_path("../../templates/systemd", __FILE__)
-    set_if_empty :procfile_service_env_vars,       {}
+    set_if_empty :procfile_service_env_vars,       -> { fetch(:default_env, {}) }
   end
 end
