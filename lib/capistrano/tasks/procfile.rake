@@ -3,19 +3,20 @@ require "ostruct"
 require "procfile"
 require "utils"
 
-load File.expand_path("../set_procfile.rake", __FILE__)
-
 namespace :procfile do
   desc "Apply Procfile commands on server(s)"
-  task :apply => [:set_procfile] do
+  task :apply do
+    Rake::Task["procfile:applying"].invoke
+  end
+
+  desc "Applying Procfile commands on server(s)"
+  task :applying => [:set_procfile, :set_host_properties] do
     common_options = fetch(:procfile_options, {})
 
     on release_roles(:all) do |host|
       within release_path do
         procfile = fetch(:procfile, nil)
         next if procfile.nil?
-
-        capture_host_specs! host
 
         @application_name  = fetch(:application)
         services_templates = {}
@@ -106,15 +107,6 @@ namespace :procfile do
         next if fetch(:procfile, nil).nil?
       end
     end
-  end
-
-  private
-
-  def capture_host_specs!(host)
-    host.properties.specs = OpenStruct.new({
-      number_of_cpus: capture("grep -c processor /proc/cpuinfo").to_i,
-      memory: (capture("awk '/MemTotal/ {print $2}' /proc/meminfo").to_i / 1024).round,
-    })
   end
 end
 
