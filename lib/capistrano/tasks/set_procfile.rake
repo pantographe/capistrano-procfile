@@ -5,9 +5,7 @@ namespace :procfile do
     procfile = nil
 
     on primary(:app) do |host|
-      within release_path do
-        procfile = capture(:cat, "#{release_path}/#{fetch(:procfile_path, "Procfile")}") if test("[[ -f #{release_path}/#{fetch(:procfile_path, "Procfile")} ]]")
-      end
+      procfile = capture(:cat, "#{release_path}/#{fetch(:procfile_path, "Procfile")}") if test("[[ -f #{release_path}/#{fetch(:procfile_path, "Procfile")} ]]")
     end
 
     if procfile.nil?
