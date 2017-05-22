@@ -144,7 +144,7 @@ private
 end
 
 Capistrano::DSL.stages.each do |stage|
-  after stage, "procfile:set_procfile"
+  # after stage, "procfile:set_procfile"
 end
 
 namespace :load do
