@@ -8,7 +8,7 @@
 #
 # Mainly from: https://github.com/ddollar/foreman/blob/9bb0903fe864bf3f4d663e9c6fb8d6683ecabf34/lib/foreman/procfile.rb
 #
-class Procfile
+class CapistranoProcfile::Procfile
 
   # Initialize a Procfile.
   #
@@ -84,6 +84,32 @@ class Procfile
     File.open(filename, "w") do |file|
       file.puts self.to_s
     end
+  end
+
+  def diff(procfile, &block)
+    raise Exception, "" unless procfile.kind_of?(Procfile)
+
+    changes       = {}
+    # self_keys     = @entries.map { |e| e[0] }
+    # procfile_keys = procfile.entries.map { |e| e[0] }
+
+    self_keys     = @entries.to_h.keys
+    procfile_keys = procfile.to_h.keys
+
+    # puts self_keys.inspect
+    (self_keys - procfile_keys).each do |k|
+      changes[k] = :removed
+    end
+
+    (procfile_keys - self_keys).each do |k|
+      changes[k] = :added
+    end
+
+    (self_keys & procfile_keys).each do |k|
+      changes[k] = self[k] === procfile[k] ? :unchanged : :updated
+    end
+
+    changes
   end
 
   # Get the +Procfile+ as a +String+.

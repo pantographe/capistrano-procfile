@@ -1,15 +1,6 @@
-class Utils
-  def self.process_env_vars(host, vars)
-    vars = OpenStruct.new(vars)
+require "ostruct"
 
-    vars.each_pair do |var, env|
-      args      = [host]
-      vars[var] = env.call(*args.take(env.arity)) if env.respond_to?(:call)
-    end
-
-    vars
-  end
-
+class CapistranoProcfile::Utils
   # From: https://github.com/rails/rails/blob/f90a08c193d4ec8267f4409b7a670c2b53e0621d/activesupport/lib/active_support/inflector/transliterate.rb#L83
   def self.parameterize(string)
     # parameterized_string = transliterate(string)

@@ -1,75 +1,55 @@
-require "erb"
-require "ostruct"
-require "procfile"
-require "utils"
+require "capistrano-procfile"
 
 namespace :procfile do
   desc "Apply Procfile commands on server(s)"
   task :apply do
-    Rake::Task["procfile:applying"].invoke
+    invoke "procfile:applying"
   end
 
   desc "Applying Procfile commands on server(s)"
   task :applying => [:set_procfile, :set_host_properties] do
-    common_options = fetch(:procfile_options, {})
-
     procfile = fetch(:procfile, nil)
     next if procfile.nil?
 
     on release_roles(:all) do |host|
+    tmp_dir = fetch(:tmp_dir, "/tmp") # @todo Use a subdir in /tmp?
+
+    rendered_path  = fetch(:procfile_service_path)
+    templates_path = fetch(:procfile_service_template_path)
+
+    common_options  = CapistranoProcfile::Options.new(fetch(:procfile_options))
+    common_env_vars = CapistranoProcfile::EnvVars.new(fetch(:procfile_service_env_vars))
+
       within release_path do
-        @application_name  = fetch(:application)
-        services_templates = {}
+        execute :mkdir, "-pv", tmp_dir if test "[[ ! -f #{tmp_dir} ]]"
 
-        rendered_path  = fetch(:procfile_service_path)
-        templates_path = fetch(:procfile_service_template_path)
-        service_name   = Utils.parameterize(fetch(:procfile_service_name))
+        options = common_options.merge(host.properties.fetch(:procfile_options) || {})
+        options.apply_host(host)
 
-        env_vars = Utils.process_env_vars(host, fetch(:procfile_service_env_vars))
-        options  = OpenStruct.new(host.properties.fetch(:procfile_options))
-        i        = 0
+        env_vars = common_env_vars.merge(host.properties.fetch(:procfile_env_vers) || {})
+        env_vars.apply_host(host)
 
-        execute :mkdir, "-p", rendered_path
-
-        procfile.entries(names: host.roles) do |procname, command|
-          @service_name   = procname
-          @target_name    = service_name
-          @user           = options.user || host.user
-          @group          = options.group
-          @umask          = options.umask
-          @root_path      = current_path
-          @command        = command
-          @restart_method = "always"
-          @restart_sec    = 1
-          @timeout        = 5
-
-          @env_vars      = env_vars
-          @env_vars.port = (@env_vars.port || 5000).to_i + (i.to_i * 100)
-
-          i += 1
-
-          # Service template.
-          service = ERB.new(File.read(File.join(templates_path, "process.service.erb")), nil, "-").result(binding)
-          service_filename = "#{service_name}-#{procname}.service"
-
-          as :root do
-            upload! StringIO.new(service), "#{rendered_path}/#{service_filename}"
-            sudo :chmod, "+r", "#{rendered_path}/#{service_filename}"
-          end
-
-          services_templates[service_filename] = service
-        end
-
-        # Target template.
-        @services_filenames = services_templates.keys
-        target_template = ERB.new(File.read(File.join(templates_path, "master.target.erb")), nil, "-").result(binding)
+        exporter = CapistranoProcfile::Exporter.new(procfile, host, templates_path, {
+          app: service_name,
+          user: options.user || host.user,
+          group: options.group,
+          umask: options.umask,
+          root:  current_path,
+          env_vars: env_vars,
+        })
 
         as :root do
-          upload! StringIO.new(target_template), "#{rendered_path}/#{service_name}.target"
-          sudo :chmod, "+r", "#{rendered_path}/#{service_name}.target"
+          exporter.files do |filename, content|
+            upload! StringIO.new(content), "#{tmp_dir}/#{filename}"
+
+            sudo :cp,    "-a", "#{tmp_dir}/#{filename}", "#{fetch(:procfile_service_path)}/#{filename}"
+            sudo :chmod, "+r", "#{rendered_path}/#{filename}"
+          end
+
+          upload! StringIO.new(exporter.procfile_lock), "#{release_path}/Procfile.lock"
         end
 
-        info ">> #{@services_filenames.join(", ")} services applied on #{host}"
+        info ">> #{exporter.filenames.join(", ")} services applied on #{host}"
 
         sudo :systemctl, "daemon-reload"
       end
@@ -152,7 +132,7 @@ namespace :procfile do
   end
 private
   def service_name
-    Utils.parameterize(fetch(:procfile_service_name))
+    CapistranoProcfile::Utils.parameterize(fetch(:procfile_service_name))
   end
 end
 

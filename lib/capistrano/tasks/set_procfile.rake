@@ -1,5 +1,3 @@
-require "procfile"
-
 namespace :procfile do
   task :set_procfile do
     procfile = nil
@@ -11,7 +9,7 @@ namespace :procfile do
     if procfile.nil?
       warn "Procfile not found"
     else
-      procfile = Procfile.new(procfile)
+      procfile = CapistranoProcfile::Procfile.new(procfile)
     end
 
     set(:procfile, procfile)
