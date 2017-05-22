@@ -4,6 +4,12 @@ namespace :procfile do
   desc "Apply Procfile commands on server(s)"
   task :apply do
     invoke "procfile:applying"
+    invoke "procfile:start"
+
+    puts "Wait 15 second before check"
+    sleep 15
+
+    invoke "procfile:check"
   end
 
   desc "Applying Procfile commands on server(s)"
