@@ -76,29 +76,35 @@ namespace :procfile do
     end
   end
 
-  namespace :systemd do
-    %w( disable enable is-active is-enabled is-failed reload restart start status stop ).each do |cmd|
-      desc "#{cmd.capitalize} Procfile process on servers"
-      task cmd.to_sym => [:set_procfile] do
-        on release_roles(:all) do
-          next if fetch(:procfile, nil).nil?
+  # Loop to have "start" and "enable".
+  %w{ start stop restart }.each do |cmd|
+    desc "#{cmd.capitalize} Procfile services"
+    # manage options to be able to specify a service or services?
+    task cmd.to_sym => [:set_procfile] do
+      next if fetch(:procfile, nil).nil?
 
-          sudo :systemctl, cmd, "#{parameterize(fetch(:procfile_service_name))}.target"
+      on release_roles(:all) do
+        if !test("[[ -f #{fetch(:procfile_service_path)}/#{service_name}.target ]]")
+          info "Nothing to do on #{host}"
+          next
         end
+
+        sudo :systemctl, cmd, "#{service_name}.target"
       end
     end
   end
 
-  desc "Restart services"
-  task :restart => [:set_procfile] do
-    next if fetch(:procfile, nil).nil?
+  %w{ enable disable }.each do |cmd|
+    desc "#{cmd.capitalize} Procfile services"
+    task cmd.to_sym => [:set_procfile] do
+      next if fetch(:procfile, nil).nil?
 
-    on release_roles(:all) do
-      within release_path do
-        sudo :systemctl, "restart", "#{Utils.parameterize(fetch(:procfile_service_name))}.target"
+      on release_roles(:all) do
+        sudo :systemctl, cmd, "#{service_name}.target"
       end
     end
   end
+
 
   desc "Cleanup services"
   task :cleanup => [:set_procfile] do
@@ -108,6 +114,10 @@ namespace :procfile do
       within release_path do
       end
     end
+  end
+private
+  def service_name
+    Utils.parameterize(fetch(:procfile_service_name))
   end
 end
 
