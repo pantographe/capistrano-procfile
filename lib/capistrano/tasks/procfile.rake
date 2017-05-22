@@ -105,6 +105,32 @@ namespace :procfile do
     end
   end
 
+  desc "Check services status"
+  task :check => [:set_procfile] do
+    procfile = fetch(:procfile, nil)
+    next if procfile.nil?
+
+    on release_roles(:all) do |host|
+      procfile.entries(names: @host.roles) do |procname, command|
+        if test "sudo systemctl is-active #{service_name}-#{procname}.service"
+          info "#{procname} service is active on #{host}"
+        else
+          is_failed = test "sudo systemctl is-failed #{service_name}-#{procname}.service"
+
+          if is_failed
+            error "#{procname} service is failed on #{host}"
+          else
+            warn "#{procname} service is not active on #{host}"
+          end
+
+          if fetch(:deploying, false) === true && is_failed
+            # @todo invoke rollback
+            # Rake::Task["deploy:rollback"].invoke
+          end
+        end
+      end
+    end
+  end
 
   desc "Cleanup services"
   task :cleanup => [:set_procfile] do
