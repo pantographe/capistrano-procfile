@@ -17,7 +17,7 @@ namespace :procfile do
     procfile = fetch(:procfile, nil)
     next if procfile.nil?
 
-    on release_roles(:all) do |host|
+    servers = release_roles(:all) # @todo Use Procfile.keys as roles?
     tmp_dir = fetch(:tmp_dir, "/tmp") # @todo Use a subdir in /tmp?
 
     rendered_path  = fetch(:procfile_service_path)
@@ -26,6 +26,7 @@ namespace :procfile do
     common_options  = CapistranoProcfile::Options.new(fetch(:procfile_options))
     common_env_vars = CapistranoProcfile::EnvVars.new(fetch(:procfile_service_env_vars))
 
+    on servers, in: :groups, limit: (servers.length / 3).round do |host|
       within release_path do
         execute :mkdir, "-pv", tmp_dir if test "[[ ! -f #{tmp_dir} ]]"
 
