@@ -111,8 +111,17 @@ namespace :procfile do
     next if fetch(:procfile, nil).nil?
 
     on roles(:all) do |host|
-      within release_path do
+      Rake::Task["procfile:disable"].invoke
+      Rake::Task["procfile:stop"].invoke
+
+      files = capture(:ls, "-x", "#{fetch(:procfile_service_path)}/#{service_name}-*.service", raise_on_non_zero_exit: false).split
+      files << capture(:ls, "-x", "#{fetch(:procfile_service_path)}/#{service_name}.target", raise_on_non_zero_exit: false)
+
+      files.each do |file|
+        sudo :rm, file if test("[[ -f #{file} ]]")
       end
+
+      sudo :systemctl, "daemon-reload"
     end
   end
 private
