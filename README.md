@@ -56,13 +56,15 @@ set :procfile_service_env_vars,      {}
 ### Tasks
 
 ```
-cap procfile:apply    # Apply Procfile commands on servers
-...
+cap procfile:check[procname]        # Check services status
+cap procfile:cleanup                # Cleanup services
+cap procfile:disable                # Disable Procfile services
+cap procfile:enable                 # Enable Procfile services
+cap procfile:kill[signal,procname]  # Kill Procfile service(s)
+cap procfile:restart[procname]      # Restart Procfile service(s)
+cap procfile:start[procname]        # Start Procfile service(s)
+cap procfile:stop[procname]         # Stop Procfile service(s)
 ```
-
-All tasks except `procfile:apply` will exec `systemd` on the `.target` file.
-That's mean
-
 
 ### Examples
 
