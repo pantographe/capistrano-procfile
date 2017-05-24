@@ -1,82 +1,75 @@
-require "capistrano-procfile"
+require "capistrano/procfile/dsl"
+
+include Capistrano::Procfile::DSL
 
 namespace :procfile do
   desc "Apply Procfile commands on server(s)"
   task :apply do
-    invoke "procfile:applying"
-    invoke "procfile:start"
-
-    puts "Wait 15 second before check"
-    sleep 15
-
-    invoke "procfile:check"
+    invoke "procfile:apply:updating"
+    invoke "procfile:apply:updated"
+    invoke "procfile:apply:starting"
+    invoke "procfile:apply:started"
+    invoke "procfile:apply:enable"
   end
 
-  desc "Applying Procfile commands on server(s)"
-  task :applying => [:set_procfile, :set_host_properties] do
-    procfile = fetch(:procfile, nil)
-    next if procfile.nil?
+  namespace :apply do
+    task :update do
+      next unless fetch(:procfile_apply_automatically, true)
 
-    servers = release_roles(:all) # @todo Use Procfile.keys as roles?
-    tmp_dir = fetch(:tmp_dir, "/tmp") # @todo Use a subdir in /tmp?
+       invoke "procfile:apply:updating"
+       invoke "procfile:apply:updated"
+    end
 
-    rendered_path  = fetch(:procfile_service_path)
-    templates_path = fetch(:procfile_service_template_path)
+    task :updating => [:set_procfile, :set_host_properties]  do
+      next if procfile.nil?
 
-    common_options  = CapistranoProcfile::Options.new(fetch(:procfile_options))
-    common_env_vars = CapistranoProcfile::EnvVars.new(fetch(:procfile_service_env_vars))
+      rounded_on release_roles(:all) do |host|
+        within release_path do
+          procfile_apply host
+          procfile_generate_lock host
 
-    on servers, in: :groups, limit: (servers.length / 3).round do |host|
-      within release_path do
-        execute :mkdir, "-pv", tmp_dir if test "[[ ! -f #{tmp_dir} ]]"
-
-        options = common_options.merge(host.properties.fetch(:procfile_options) || {})
-        options.apply_host(host)
-
-        env_vars = common_env_vars.merge(host.properties.fetch(:procfile_env_vers) || {})
-        env_vars.apply_host(host)
-
-        exporter = CapistranoProcfile::Exporter.new(procfile, host, templates_path, {
-          app: service_name,
-          user: options.user || host.user,
-          group: options.group,
-          umask: options.umask,
-          root:  current_path,
-          env_vars: env_vars,
-        })
-
-        as :root do
-          exporter.files do |filename, content|
-            upload! StringIO.new(content), "#{tmp_dir}/#{filename}"
-
-            sudo :cp,    "-a", "#{tmp_dir}/#{filename}", "#{fetch(:procfile_service_path)}/#{filename}"
-            sudo :chmod, "+r", "#{rendered_path}/#{filename}"
-          end
-
-          upload! StringIO.new(exporter.procfile_lock), "#{release_path}/Procfile.lock"
+          procfile_reload_daemon
         end
-
-        info ">> #{exporter.filenames.join(", ")} services applied on #{host}"
-
-        sudo :systemctl, "daemon-reload"
       end
+    end
+
+    task :updated do
+    end
+
+    task :start do
+      # @todo next unless fetch(:procfile_apply_automatically, false)
+
+      invoke "procfile:apply:starting"
+      invoke "procfile:apply:started"
+    end
+
+    task :starting do
+      # @todo Start and check here or after "published"
+      invoke "procfile:start"
+
+      wait_until fetch(:procfile_check_timeout), "Wait %s second before check"
+
+      invoke "procfile:check"
+    end
+
+    task :started do
+    end
+
+    task :enable do
+      # @todo next unless fetch(:procfile_enable_automatically, false)
+
+      invoke "procfile:enable"
     end
   end
 
   # Loop to have "start" and "enable".
   %w{ start stop restart }.each do |cmd|
-    desc "#{cmd.capitalize} Procfile services"
-    # manage options to be able to specify a service or services?
-    task cmd.to_sym => [:set_procfile] do
-      next if fetch(:procfile, nil).nil?
+    desc "#{cmd.capitalize} Procfile service(s)"
+    task cmd.to_sym, [:procname] => [:set_procfile] do |t, args|
+      next if procfile.nil?
 
-      on release_roles(:all) do
-        if !test("[[ -f #{fetch(:procfile_service_path)}/#{service_name}.target ]]")
-          info "Nothing to do on #{host}"
-          next
-        end
-
-        sudo :systemctl, cmd, "#{service_name}.target"
+      rounded_on release_roles(:all), force: (cmd == "restart") do
+        public_send "procfile_#{cmd}", args[:procname]
       end
     end
   end
@@ -84,36 +77,43 @@ namespace :procfile do
   %w{ enable disable }.each do |cmd|
     desc "#{cmd.capitalize} Procfile services"
     task cmd.to_sym => [:set_procfile] do
-      next if fetch(:procfile, nil).nil?
+      next if procfile.nil?
 
-      on release_roles(:all) do
-        sudo :systemctl, cmd, "#{service_name}.target"
+      on release_roles(:all) do |host|
+        public_send "procfile_#{cmd}"
+      end
+    end
+  end
+
+  desc "Kill Procfile service(s)"
+  task :kill, [:signal, :procname] => [:set_procfile] do |t, args|
+    next if procfile.nil?
+
+    rounded_on release_roles(:all) do |host|
+      procfile.entries(names: host.roles) do |procname, command|
+        procfile_kill(args[:signal], args[:procname])
       end
     end
   end
 
   desc "Check services status"
   task :check => [:set_procfile] do
-    procfile = fetch(:procfile, nil)
     next if procfile.nil?
 
     on release_roles(:all) do |host|
-      procfile.entries(names: @host.roles) do |procname, command|
-        if test "sudo systemctl is-active #{service_name}-#{procname}.service"
+      # @todo Have Procfile who contain both Procfile and Procfile.lock
+      procfile.entries(names: host.roles) do |procname, command|
+        case status = procfile_process_status(procname)
+        when :active
           info "#{procname} service is active on #{host}"
-        else
-          is_failed = test "sudo systemctl is-failed #{service_name}-#{procname}.service"
+        when :not_active
+          warn "#{procname} service is not active on #{host}"
+        when :failed
+          error "#{procname} service is failed on #{host}"
+        end
 
-          if is_failed
-            error "#{procname} service is failed on #{host}"
-          else
-            warn "#{procname} service is not active on #{host}"
-          end
-
-          if fetch(:deploying, false) === true && is_failed
-            # @todo invoke rollback
-            # Rake::Task["deploy:rollback"].invoke
-          end
+        if fetch(:deploying, false) && status == :failed
+          invoke "deploy:rollback"
         end
       end
     end
@@ -121,39 +121,34 @@ namespace :procfile do
 
   desc "Cleanup services"
   task :cleanup => [:set_procfile] do
-    next if fetch(:procfile, nil).nil?
+    next if procfile.nil?
 
-    on roles(:all) do |host|
-      Rake::Task["procfile:disable"].invoke
-      Rake::Task["procfile:stop"].invoke
+    invoke "procfile:disable"
+    invoke "procfile:stop"
 
-      files = capture(:ls, "-x", "#{fetch(:procfile_service_path)}/#{service_name}-*.service", raise_on_non_zero_exit: false).split
-      files << capture(:ls, "-x", "#{fetch(:procfile_service_path)}/#{service_name}.target", raise_on_non_zero_exit: false)
+    on release_roles(:all) do |host|
+      procfile_cleanup
 
-      files.each do |file|
-        sudo :rm, file if test("[[ -f #{file} ]]")
-      end
-
-      sudo :systemctl, "daemon-reload"
+      procfile_reload_daemon
     end
   end
-private
-  def service_name
-    CapistranoProcfile::Utils.parameterize(fetch(:procfile_service_name))
-  end
 end
 
-Capistrano::DSL.stages.each do |stage|
-  # after stage, "procfile:set_procfile"
-end
+before "deploy:publishing", "procfile:apply:update"
+before "deploy:finishing",  "procfile:apply:start"
+after  "deploy:finished",   "procfile:apply:enable"
 
 namespace :load do
   task :defaults do
     set_if_empty :procfile_path,                   "Procfile"
-    set_if_empty :procfile_options,                {}
+    set_if_empty :procfile_options,                {
+      user: ->(host) { host.user }
+    }
+
     set_if_empty :procfile_service_name,           -> { fetch(:application) }
     set_if_empty :procfile_service_path,           "/lib/systemd/system"
     set_if_empty :procfile_service_template_path,  File.expand_path("../../templates/systemd", __FILE__)
     set_if_empty :procfile_service_env_vars,       -> { fetch(:default_env, {}) }
+    set_if_empty :procfile_check_timeout,          15
   end
 end
