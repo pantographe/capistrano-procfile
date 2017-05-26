@@ -1,6 +1,6 @@
 # Capistrano::Procfile
 
-**⚠️ This project is work in progress ⚠️**
+**⚠️ This project is not production ready for now ⚠️**
 
 Procfile specific tasks for Capistrano v3.  
 This Capistrano v3 extension read the `Procfile` of your application to
@@ -46,10 +46,19 @@ In each server a service target will be generated to simplify the availability o
 Configurable options (default values):
 
 ```ruby
+set_if_empty :procfile_path,    "Procfile"
+set_if_empty :procfile_options, {
+  user: ->(host) { host.user }
+}
+
 set :procfile_service_name,          -> { fetch(:application) }
 set :procfile_service_path,          "/lib/systemd/system"
 set :procfile_service_template_path, File.expand_path("../../templates/systemd", __FILE__)
-set :procfile_service_env_vars,      {}
+set :procfile_service_env_vars,      -> { fetch(:default_env, {}) }
+set :procfile_check_timeout,         15
+
+set :procfile_apply_automatically,  true
+set :procfile_enable_automatically, -> { fetch(:procfile_apply_automatically) }
 ```
 
 
