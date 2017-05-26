@@ -23,7 +23,6 @@ namespace :puma do
   end
 end
 
-after "deploy:reverted", "puma:phased_restart"
 after "deploy:published", "puma:phased_restart"
 ```
 
