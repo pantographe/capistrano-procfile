@@ -1,3 +1,5 @@
+require "capistrano/procfile/diff"
+
 module Capistrano
   module Procfile
     module DSL
@@ -5,29 +7,41 @@ module Capistrano
         def procfile_apply(host)
           rendered_path  = fetch(:procfile_service_path)
 
-          execute :mkdir, "-pv", tmp_dir if test "[[ ! -f #{tmp_dir} ]]"
+          backend.execute :mkdir, "-p", tmp_dir
+          backend.execute :rm, "-rf", "#{tmp_dir}/*"
+
+          backend.execute :mkdir, "-p", rendered_path unless backend.test "[[ -d #{rendered_path} ]]"
 
           exporter = exporter(host)
           # export = exporter.generate! host
+          diff = Diff.new(backend, "#{procfile_service_name}-*.service")
 
-          backend.as :root do
-            exporter.files do |filename, content|
-              backend.upload! StringIO.new(content), "#{tmp_dir}/#{filename}"
-
-              backend.sudo :cp,    "-a", "#{tmp_dir}/#{filename}", "#{fetch(:procfile_service_path)}/#{filename}"
-              backend.sudo :chmod, "+r", "#{rendered_path}/#{filename}"
-            end
-
-            backend.upload! StringIO.new(exporter.procfile_lock), "#{release_path}/Procfile.lock"
+          exporter.service_files do |filename, content|
+            backend.upload! StringIO.new(content), "#{tmp_dir}/#{filename}"
           end
 
-          backend.info ">> #{exporter.filenames.join(", ")} services applied on #{host}"
+          backend.as :root do
+            diff.diff(rendered_path, tmp_dir).each do |service, state|
+              case state
+              when :deleted
+                backend.execute :systemctl, "stop", service
+                backend.execute :rm, "#{rendered_path}/#{service}"
+              when :added
+                backend.execute :cp, "-a", "#{tmp_dir}/#{service}", "#{rendered_path}/#{service}"
+                backend.execute :chmod, "+r", "#{rendered_path}/#{service}"
+              when :updated
+                backend.execute :systemctl, "stop", service
+                backend.execute :cp, "-a", "#{tmp_dir}/#{service}", "#{rendered_path}/#{service}"
+                backend.execute :chmod, "+r", "#{rendered_path}/#{service}"
+              end
 
-          # diff = CapistranoProcfile::Diff.new(self, host, procfile)
-          # put diff.diff("/lib/systemd/system", "/tmp").inspect
+              backend.info "#{service} is #{state} on #{host}"
+            end
 
-          # diff -qI "^#" /tmp/demo-app-web.service /lib/systemd/system/demo-app-web.service
-          # backend.test("systemctl is-failed demo-app-web.service")
+            exporter.global_files do |filename, content|
+              backend.upload! StringIO.new(content), "#{rendered_path}/#{filename}"
+            end
+          end
         end
 
         def procfile_generate_lock(host)
@@ -39,7 +53,7 @@ module Capistrano
       private
 
         def tmp_dir
-          fetch(:tmp_dir, "/tmp") # @todo Use a subdir in /tmp?
+          @tmp_dir ||= "#{fetch(:tmp_dir, "/tmp")}/#{fetch(:application)}_procfile"
         end
 
         def exporter(host)
@@ -48,7 +62,7 @@ module Capistrano
           options  = generate_options(host)
           env_vars = generate_env_vars(host)
 
-          exporter = Exporter.new(procfile, host, templates_path, {
+          Exporter.new(procfile, host, templates_path, {
             app: procfile_service_name,
             user: "deploy", # options.user || host.user,
             # group: options.group,

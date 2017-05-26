@@ -70,6 +70,26 @@ module Capistrano
         end
       end
 
+      def service_files(&block)
+        if block_given?
+          @files.each do |(filename, content)|
+            yield filename, content if filename.end_with? ".service"
+          end
+        else
+          @files
+        end
+      end
+
+      def global_files(&block)
+        if block_given?
+          @files.each do |(filename, content)|
+            yield filename, content if filename.end_with? ".target"
+          end
+        else
+          @files
+        end
+      end
+
     private
 
       def add_file(filename, content)
