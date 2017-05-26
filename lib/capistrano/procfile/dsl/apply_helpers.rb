@@ -39,7 +39,9 @@ module Capistrano
             end
 
             exporter.global_files do |filename, content|
-              backend.upload! StringIO.new(content), "#{rendered_path}/#{filename}"
+              backend.upload! StringIO.new(content), "#{tmp_dir}/#{filename}"
+              backend.execute :cp, "-a", "#{tmp_dir}/#{filename}", "#{rendered_path}/#{filename}"
+              backend.execute :chmod, "+r", "#{rendered_path}/#{filename}"
             end
           end
         end
