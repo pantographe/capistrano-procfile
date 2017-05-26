@@ -56,6 +56,7 @@ set :procfile_service_env_vars,      {}
 ### Tasks
 
 ```
+cap procfile:apply                  # Apply Procfile commands on server(s)
 cap procfile:check[procname]        # Check services status
 cap procfile:cleanup                # Cleanup services
 cap procfile:disable                # Disable Procfile services

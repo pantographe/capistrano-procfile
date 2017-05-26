@@ -13,7 +13,6 @@ module Capistrano
         @procfile       = procfile
         @host           = host
         @templates_path = templates_path
-        @target_file    = nil
         @files          = {}
         @options        = options
 
@@ -27,7 +26,7 @@ module Capistrano
         @procfile.entries(names: host.roles) do |procname, command|
           service_filename = "#{app}-#{procname}.service"
 
-          env_vars.port += i.to_i * 100
+          env_vars.port += i.to_i * 100 if env_vars.port.is_a? Integer
 
           add_file service_filename, template("process.service.erb", binding)
           processes_names << service_filename

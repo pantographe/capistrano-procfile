@@ -21,9 +21,9 @@ module Capistrano
       end
 
       def apply_host(host)
-        self.each_pair do |var, env|
-          args      = [host]
-          self[var] = env.call(*args.take(env.arity)) if env.respond_to?(:call)
+        self.each_pair do |k, v|
+          args    = [host]
+          self[k] = v.call(*args.take(v.arity)) if v.respond_to?(:call)
         end
       end
 

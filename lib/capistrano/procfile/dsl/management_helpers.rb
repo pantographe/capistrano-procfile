@@ -34,6 +34,7 @@ module Capistrano
 
         def procfile_kill(sig=:term, procname=nil)
           return unless is_service_exists?(procname)
+          return unless procfile_process_status(procname) == :active
 
           backend.sudo :systemctl, "kill", service_filename(procname), "--signal=#{sig.to_s.upcase}"
         end
@@ -52,13 +53,13 @@ module Capistrano
         end
 
         def procfile_process_status(procname)
-          is_failed = backend.test "sudo systemctl is-failed #{procfile_service_name}-#{procname}.service"
+          is_failed = backend.test "sudo systemctl is-failed #{service_filename(procname)}"
           status    = nil
 
           if is_failed
             status = :failed
           else
-            if backend.test "sudo systemctl is-active #{procfile_service_name}-#{procname}.service"
+            if backend.test "sudo systemctl is-active #{service_filename(procname)}"
               status = :active
             else
               status = :not_active

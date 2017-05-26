@@ -14,10 +14,10 @@ namespace :procfile do
 
   namespace :apply do
     task :update do
-      next unless fetch(:procfile_apply_automatically, true)
+      next unless fetch(:procfile_apply_automatically)
 
-       invoke "procfile:apply:updating"
-       invoke "procfile:apply:updated"
+      invoke "procfile:apply:updating"
+      invoke "procfile:apply:updated"
     end
 
     task :updating => [:set_procfile, :set_host_properties]  do
@@ -26,7 +26,6 @@ namespace :procfile do
       rounded_on release_roles(:all) do |host|
         within release_path do
           procfile_apply host
-          procfile_generate_lock host
 
           procfile_reload_daemon
         end
@@ -37,7 +36,7 @@ namespace :procfile do
     end
 
     task :start do
-      # @todo next unless fetch(:procfile_apply_automatically, false)
+      next unless fetch(:procfile_apply_automatically)
 
       invoke "procfile:apply:starting"
       invoke "procfile:apply:started"
@@ -56,7 +55,7 @@ namespace :procfile do
     end
 
     task :enable do
-      # @todo next unless fetch(:procfile_enable_automatically, false)
+      next unless fetch(:procfile_enable_automatically)
 
       invoke "procfile:enable"
     end
@@ -97,7 +96,7 @@ namespace :procfile do
   end
 
   desc "Check services status"
-  task :check => [:set_procfile] do
+  task :check, [:procname] => [:set_procfile] do |t, args|
     next if procfile.nil?
 
     on release_roles(:all) do |host|
@@ -150,5 +149,8 @@ namespace :load do
     set_if_empty :procfile_service_template_path,  File.expand_path("../../templates/systemd", __FILE__)
     set_if_empty :procfile_service_env_vars,       -> { fetch(:default_env, {}) }
     set_if_empty :procfile_check_timeout,          15
+
+    set_if_empty :procfile_apply_automatically,  true
+    set_if_empty :procfile_enable_automatically, -> { fetch(:procfile_apply_automatically) }
   end
 end
