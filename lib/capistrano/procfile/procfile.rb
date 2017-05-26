@@ -77,6 +77,8 @@ module Capistrano
       #
       # @param [String] filename  The filename of the +Procfile+ to load.
       def load(filename)
+        filename = File.read(filename) if File.file? filename
+
         @entries.replace parse(filename)
       end
 
@@ -136,8 +138,6 @@ module Capistrano
       #
       # @return [Hash]
       def parse(procfile)
-        procfile = File.read(procfile) if File.file? procfile
-
         entries = Hash.new
 
         procfile.gsub("\r\n", "\n").split("\n").map do |line|

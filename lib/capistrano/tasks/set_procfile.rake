@@ -5,11 +5,12 @@ namespace :procfile do
     procfile = nil
 
     on primary(:app) do |host|
-      procfile = capture(:cat, "#{release_path}/#{fetch(:procfile_path, "Procfile")}") if test("[[ -f #{release_path}/#{fetch(:procfile_path, "Procfile")} ]]")
+      procfile_path = "#{release_path}/#{fetch(:procfile_path)}"
+      procfile = capture(:cat, procfile_path) if test("[[ -f #{procfile_path} ]]")
     end
 
     if procfile.nil?
-      warn "Procfile not found"
+      warn "#{fetch(:procfile_path)} not found"
     else
       procfile = Capistrano::Procfile::Procfile.new(procfile)
     end

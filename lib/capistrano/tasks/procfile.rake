@@ -43,7 +43,6 @@ namespace :procfile do
     end
 
     task :starting do
-      # @todo Start and check here or after "published"
       invoke "procfile:start"
 
       wait_until fetch(:procfile_check_timeout), "Wait %s second before check"
