@@ -69,12 +69,14 @@ module Capistrano
         end
 
         def common_env_vars
-          @common_env_vars ||= Capistrano::Procfile::EnvVars.new(fetch(:procfile_service_env_vars))
+          env = fetch(:default_env, {}).merge(fetch(:procfile_service_env_vars))
+          @common_env_vars ||= Capistrano::Procfile::EnvVars.new(env)
         end
 
         def generate_env_vars(host)
           env_vars = common_env_vars.merge(host.properties.fetch(:procfile_env_vers) || {})
           env_vars.apply_host(host)
+          env_vars.cleanup!
           env_vars
         end
       end

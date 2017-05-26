@@ -27,6 +27,12 @@ module Capistrano
         end
       end
 
+      def cleanup!
+        self.each_pair do |k, v|
+          self.delete_field(k) if v.nil?
+        end
+      end
+
     private
 
       def load_defaults!
