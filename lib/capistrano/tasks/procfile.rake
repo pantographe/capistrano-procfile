@@ -102,6 +102,8 @@ namespace :procfile do
       # @todo Have Procfile who contain both Procfile and Procfile.lock
       procfile.entries(names: host.roles) do |procname, command|
         case status = procfile_process_status(procname)
+        when :not_installed
+          warn "#{procname} service is not installed on #{host}"
         when :active
           info "#{procname} service is active on #{host}"
         when :not_active

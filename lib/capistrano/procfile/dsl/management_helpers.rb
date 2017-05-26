@@ -53,10 +53,11 @@ module Capistrano
         end
 
         def procfile_process_status(procname)
-          is_failed = backend.test "sudo systemctl is-failed #{service_filename(procname)}"
-          status    = nil
+          status = nil
 
-          if is_failed
+          if !is_service_exists?(procname, verbose: false)
+            status = :not_installed
+          elsif backend.test "sudo systemctl is-failed #{service_filename(procname)}"
             status = :failed
           else
             if backend.test "sudo systemctl is-active #{service_filename(procname)}"
