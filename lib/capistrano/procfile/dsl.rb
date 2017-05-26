@@ -50,9 +50,9 @@ module Capistrano
         self
       end
 
-      def is_service_exists?(procname=nil)
+      def is_service_exists?(procname=nil, verbose: true)
         if !test("[[ -f #{fetch(:procfile_service_path)}/#{service_filename(procname)} ]]")
-          backend.info "Nothing to do on #{host}"
+          backend.info "Nothing to do on #{host}" if verbose
           return false
         end
 
