@@ -89,7 +89,9 @@ namespace :procfile do
 
     rounded_on release_roles(:all) do |host|
       procfile.entries(names: host.roles) do |procname, command|
-        procfile_kill(args[:signal], args[:procname])
+        if args[:procname].nil? || args[:procname].to_s == procname.to_s
+          procfile_kill(args[:signal], procname)
+        end
       end
     end
   end

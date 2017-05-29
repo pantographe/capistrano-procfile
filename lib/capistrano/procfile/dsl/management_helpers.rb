@@ -32,9 +32,12 @@ module Capistrano
           backend.sudo :systemctl, "restart", service_filename(procname)
         end
 
-        def procfile_kill(sig=:term, procname=nil)
+        def procfile_kill(sig, procname)
           return unless is_service_exists?(procname)
           return unless procfile_process_status(procname) == :active
+          raise ArgumentError, "`procname' must not be nil" if procname.nil?
+
+          sig ||= :term
 
           backend.sudo :systemctl, "kill", service_filename(procname), "--signal=#{sig.to_s.upcase}"
         end
