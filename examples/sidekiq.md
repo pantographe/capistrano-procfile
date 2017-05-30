@@ -13,9 +13,9 @@ namespace :sidekiq do
 
   task :restart do
     on roles(:worker) do
-      procfile_kill :term, :worker
+      procfile_restart :worker
       # OR
-      # procfile_restart :worker
+      # procfile_kill :term, :worker
     end
   end
 end

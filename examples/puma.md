@@ -12,13 +12,20 @@ namespace :puma do
     end
   end
 
+  task :hot_restart do
+    on roles([:web, :websocket]) do
+      procfile_kill :usr2, :web
+      procfile_kill :usr2, :websocket
+    end
+  end
+
   task :restart do
     on roles([:web, :websocket]) do
-      procfile_kill :term, :web
-      procfile_kill :term, :websocket
+      procfile_restart :web
+      procfile_restart :websocket
       # OR
-      # procfile_restart :web
-      # procfile_restart :websocket
+      # procfile_kill :term, :web
+      # procfile_kill :term, :websocket
     end
   end
 end
