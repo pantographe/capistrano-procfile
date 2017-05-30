@@ -2,34 +2,36 @@ module Capistrano
   module Procfile
     module DSL
       module ManagementHelpers
-        def procfile_enable
-          return unless is_service_exists?
+        def procfile_enable(procname=nil)
+          return unless is_service_exists?(procname)
+          return if is_service_enabled?(procname)
 
-          backend.sudo :systemctl, :enable, service_filename
+          backend.sudo :systemctl, :enable, service_filename(procname)
         end
 
-        def procfile_disable
-          return unless is_service_exists?
+        def procfile_disable(procname=nil)
+          return unless is_service_exists?(procname)
+          return unless is_service_enabled?(procname)
 
-          backend.sudo :systemctl, :disable, service_filename
+          backend.sudo :systemctl, :disable, service_filename(procname)
         end
 
         def procfile_start(procname=nil)
           return unless is_service_exists?(procname)
 
-          backend.sudo :systemctl, "start", service_filename(procname)
+          backend.sudo :systemctl, :start, service_filename(procname)
         end
 
         def procfile_stop(procname=nil)
           return unless is_service_exists?(procname)
 
-          backend.sudo :systemctl, "stop", service_filename(procname)
+          backend.sudo :systemctl, :stop, service_filename(procname)
         end
 
         def procfile_restart(procname=nil)
           return unless is_service_exists?(procname)
 
-          backend.sudo :systemctl, "restart", service_filename(procname)
+          backend.sudo :systemctl, :restart, service_filename(procname)
         end
 
         def procfile_kill(sig, procname)
@@ -39,7 +41,7 @@ module Capistrano
 
           sig ||= :term
 
-          backend.sudo :systemctl, "kill", service_filename(procname), "--signal=#{sig.to_s.upcase}"
+          backend.sudo :systemctl, :kill, service_filename(procname), "--signal=#{sig.to_s.upcase}"
         end
 
         def procfile_reload_daemon
@@ -71,6 +73,12 @@ module Capistrano
           end
 
           status
+        end
+
+      private
+
+        def is_service_enabled?(procname=nil)
+          backend.test "sudo systemctl is-enabled #{service_filename(procname)}"
         end
       end
     end
