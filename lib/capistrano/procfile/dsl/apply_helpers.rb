@@ -10,7 +10,7 @@ module Capistrano
           backend.execute :mkdir, "-p", tmp_dir
           backend.execute :rm, "-rf", "#{tmp_dir}/*"
 
-          backend.execute :mkdir, "-p", rendered_path unless backend.test "[[ -d #{rendered_path} ]]"
+          backend.sudo :mkdir, "-p", rendered_path unless backend.test "[[ -d #{rendered_path} ]]"
 
           exporter = exporter(host)
           # export = exporter.generate! host
@@ -20,29 +20,28 @@ module Capistrano
             backend.upload! StringIO.new(content), "#{tmp_dir}/#{filename}"
           end
 
-          backend.as :root do
-            diff.diff(rendered_path, tmp_dir).each do |service, state|
-              case state
-              when :deleted
-                backend.execute :systemctl, "stop", service
-                backend.execute :rm, "#{rendered_path}/#{service}"
-              when :added
-                backend.execute :cp, "-a", "#{tmp_dir}/#{service}", "#{rendered_path}/#{service}"
-                backend.execute :chmod, "+r", "#{rendered_path}/#{service}"
-              when :updated
-                backend.execute :systemctl, "stop", service
-                backend.execute :cp, "-a", "#{tmp_dir}/#{service}", "#{rendered_path}/#{service}"
-                backend.execute :chmod, "+r", "#{rendered_path}/#{service}"
-              end
-
-              backend.info "#{service} is #{state} on #{host}"
+          diff.diff(rendered_path, tmp_dir).each do |service, state|
+            case state
+            when :deleted
+              backend.sudo :systemctl, "stop", service
+              backend.sudo :rm, "#{rendered_path}/#{service}"
+            when :added
+              backend.sudo :cp, "-a", "#{tmp_dir}/#{service}", "#{rendered_path}/#{service}"
+              backend.sudo :chmod, "+r", "#{rendered_path}/#{service}"
+              backend.sudo :systemctl, "link", "#{rendered_path}/#{service}"
+            when :updated
+              backend.sudo :systemctl, "stop", service
+              backend.sudo :cp, "-a", "#{tmp_dir}/#{service}", "#{rendered_path}/#{service}"
+              backend.sudo :chmod, "+r", "#{rendered_path}/#{service}"
             end
 
-            exporter.global_files do |filename, content|
-              backend.upload! StringIO.new(content), "#{tmp_dir}/#{filename}"
-              backend.execute :cp, "-a", "#{tmp_dir}/#{filename}", "#{rendered_path}/#{filename}"
-              backend.execute :chmod, "+r", "#{rendered_path}/#{filename}"
-            end
+            backend.info "#{service} is #{state} on #{host}"
+          end
+
+          exporter.global_files do |filename, content|
+            backend.upload! StringIO.new(content), "#{tmp_dir}/#{filename}"
+            backend.sudo :cp, "-a", "#{tmp_dir}/#{filename}", "#{rendered_path}/#{filename}"
+            backend.sudo :chmod, "+r", "#{rendered_path}/#{filename}"
           end
         end
 

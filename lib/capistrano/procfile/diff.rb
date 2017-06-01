@@ -34,7 +34,7 @@ module Capistrano
       end
 
       def service_change?(current_path, new_path, service)
-        !@backend.test("diff -qI '^#' #{current_path}/#{service} #{new_path}/#{service}")
+        !@backend.test("sudo diff -qI '^#' #{current_path}/#{service} #{new_path}/#{service}")
       end
     end
   end
