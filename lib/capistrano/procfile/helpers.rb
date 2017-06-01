@@ -34,6 +34,10 @@ module  Capistrano
           options[:restart_method] || "always"
         end
 
+        def syslog_identifier
+          "%N"
+        end
+
         def env_vars
           options[:env_vars] || {}
         end
