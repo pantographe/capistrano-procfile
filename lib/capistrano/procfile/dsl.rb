@@ -34,7 +34,7 @@ module Capistrano
         opts = Hash.new
 
         if force || fetch(:my_option, false)
-          opts = { in: :groups, limit: (servers.length / 3).round }
+          opts = { in: :groups, limit: (servers.length / 3.0).ceil }
         end
 
         on servers, opts, &block
